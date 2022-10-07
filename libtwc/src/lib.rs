@@ -55,7 +55,7 @@ pub fn compile_word_map() -> anyhow::Result<LanguageMap> {
     for word_map in (*language_map.write()).values_mut() {
         let infrequent_word_pairs = word_map
             .iter()
-            .filter(|(_, &count)| count < 250_u64)
+            .filter(|(_, &count)| count < 100_u64)
             .map(|(key, _)| key.to_owned())
             .collect::<Vec<_>>();
         for key in infrequent_word_pairs {
@@ -95,7 +95,7 @@ fn read_file(filename: impl AsRef<Path>) -> anyhow::Result<Vec<Tweet>> {
         .collect())
 }
 
-fn word_qualifies(&word: &&str) -> bool {
+fn word_qualifies(word: &String) -> bool {
     use url::Url;
 
     // Zalgo detection algorithm
@@ -122,9 +122,9 @@ fn word_qualifies(&word: &&str) -> bool {
         s.chars().all(|c| SYMBOLS.contains(c))
     }
 
-    match word {
+    match word.as_ref() {
         // Empty or short strings
-        s if s.is_empty() || s.len() == 1 => false,
+        s if s.is_empty() || s.chars().count() == 1 => false,
         // Mentions
         s if s.starts_with('@') => false,
         // Hashtags
@@ -150,6 +150,11 @@ fn word_qualifies(&word: &&str) -> bool {
     }
 }
 
+fn cleanup_word(word: impl AsRef<str>) -> String {
+    const SYMBOLS: &str = "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~";
+    word.as_ref().trim_matches(&SYMBOLS.chars().collect::<Vec<_>>()[..]).to_string()
+}
+
 fn process_tweets(tweets: Vec<Tweet>, global_map: &RwLock<LanguageMap>) {
     let mut local_map = LanguageMap::new();
 
@@ -160,6 +165,7 @@ fn process_tweets(tweets: Vec<Tweet>, global_map: &RwLock<LanguageMap>) {
             .text
             .split(' ')
             .map(|s| s.trim())
+            .map(cleanup_word)
             .filter(word_qualifies);
         for word in words {
             *language_entry.entry(word.into()).or_default() += 1;
