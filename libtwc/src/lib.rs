@@ -8,7 +8,7 @@ use std::{
 };
 
 use bzip2::read::BzDecoder;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 use tweet::Tweet;
 use walkdir::WalkDir;
@@ -24,21 +24,26 @@ pub fn compile_word_map() -> anyhow::Result<LanguageMap> {
     let mut language_map = RwLock::new(LanguageMap::new());
     let language_map_shared = Arc::new(&mut language_map);
 
-    let file_count = input_files.len();
-    let current_files = Arc::new(RwLock::new(0usize));
-
     // Parallelly loop over all input files
+    let file_count = input_files.len();
+    let processed_count = Arc::new(Mutex::new(0_usize));
     input_files.into_par_iter().for_each(|file| {
         let language_map = language_map_shared.clone();
 
-        // Update stats
-        let current_count = *current_files.read();
-        let current_percentage = (current_count as f64 / file_count as f64) * 100f64;
-        println!(
-            "Reading next batch... {}/{} ({:.2}%)",
-            current_count, file_count, current_percentage
-        );
-        *current_files.write() += 1;
+        // Print progress
+        let processed_count = {
+            let mut processed_count = processed_count.lock();
+            let return_count = *processed_count;
+            *processed_count += 1;
+            return_count
+        };
+        if processed_count % 100 == 0 || processed_count == file_count - 1 {
+            let current_percentage = (processed_count as f64 / file_count as f64) * 100f64;
+            println!(
+                "{}/{} ({:.2}%)",
+                processed_count, file_count, current_percentage
+            );
+        }
 
         // Parse file and process tweets
         if let Ok(tweets) = read_file(file) {
@@ -112,6 +117,11 @@ fn word_qualifies(&word: &&str) -> bool {
         })
     }
 
+    fn is_only_symbols(s: &str) -> bool {
+        const SYMBOLS: &str = "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~";
+        s.chars().all(|c| SYMBOLS.contains(c))
+    }
+
     match word {
         // Empty or short strings
         s if s.is_empty() || s.len() == 1 => false,
@@ -130,12 +140,7 @@ fn word_qualifies(&word: &&str) -> bool {
         // HTML escapes
         s if s.starts_with('&') && s.ends_with(';') => false,
         // Symbol strings
-        s if s
-            .chars()
-            .all(|c| "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~".contains(c)) =>
-        {
-            false
-        }
+        s if is_only_symbols(s) => false,
         // Zalgo
         s if is_zalgo(s) => false,
         // Normal text
