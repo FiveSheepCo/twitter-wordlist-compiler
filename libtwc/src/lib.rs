@@ -143,6 +143,8 @@ fn word_qualifies(&word: &&str) -> bool {
         s if is_only_symbols(s) => false,
         // Zalgo
         s if is_zalgo(s) => false,
+        // Just twitter shit
+        "RT" => false,
         // Normal text
         _ => true,
     }
