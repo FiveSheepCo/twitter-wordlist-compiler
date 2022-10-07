@@ -118,7 +118,7 @@ fn word_qualifies(word: &String) -> bool {
     }
 
     fn is_only_symbols(s: &str) -> bool {
-        const SYMBOLS: &str = "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~";
+        const SYMBOLS: &str = "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~\t\r\n";
         s.chars().all(|c| SYMBOLS.contains(c))
     }
 
@@ -151,8 +151,11 @@ fn word_qualifies(word: &String) -> bool {
 }
 
 fn cleanup_word(word: impl AsRef<str>) -> String {
-    const SYMBOLS: &str = "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~";
-    word.as_ref().trim_matches(&SYMBOLS.chars().collect::<Vec<_>>()[..]).to_string()
+    const SYMBOLS: &str = "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~\t\r\n";
+    word.as_ref()
+        .trim_matches(char::is_whitespace)
+        .trim_matches(&SYMBOLS.chars().collect::<Vec<_>>()[..])
+        .to_string()
 }
 
 fn process_tweets(tweets: Vec<Tweet>, global_map: &RwLock<LanguageMap>) {
@@ -164,7 +167,6 @@ fn process_tweets(tweets: Vec<Tweet>, global_map: &RwLock<LanguageMap>) {
         let words = tweet
             .text
             .split(' ')
-            .map(|s| s.trim())
             .map(cleanup_word)
             .filter(word_qualifies);
         for word in words {

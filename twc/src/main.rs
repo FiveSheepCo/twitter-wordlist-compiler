@@ -21,6 +21,7 @@ fn main() -> anyhow::Result<()> {
             kvps.sort_by(|&(_, a), &(_, b)| b.cmp(&a));
             kvps
         };
+        println!("[{}] Writing {} entries", language, entries.len());
         let file = OpenOptions::new()
             .create(true)
             .truncate(true)
