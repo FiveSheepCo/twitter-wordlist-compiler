@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fs::OpenOptions,
     io::Read,
+    ops::RangeInclusive,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -19,13 +20,18 @@ type LanguageMap = HashMap<String, WordMap>;
 
 pub fn compile_word_map() -> anyhow::Result<LanguageMap> {
     let input_files = gather_files();
+
     let mut language_map = RwLock::new(LanguageMap::new());
     let language_map_shared = Arc::new(&mut language_map);
 
     let file_count = input_files.len();
     let current_files = Arc::new(RwLock::new(0usize));
+
+    // Parallelly loop over all input files
     input_files.into_par_iter().for_each(|file| {
         let language_map = language_map_shared.clone();
+
+        // Update stats
         let current_count = *current_files.read();
         let current_percentage = (current_count as f64 / file_count as f64) * 100f64;
         println!(
@@ -33,12 +39,14 @@ pub fn compile_word_map() -> anyhow::Result<LanguageMap> {
             current_count, file_count, current_percentage
         );
         *current_files.write() += 1;
-        for tweets in read_file(file) {
+
+        // Parse file and process tweets
+        if let Ok(tweets) = read_file(file) {
             process_tweets(tweets, *language_map);
         }
     });
 
-    // Purge infrequent words
+    // Purge infrequently used words
     for word_map in (*language_map.write()).values_mut() {
         let infrequent_word_pairs = word_map
             .iter()
@@ -50,20 +58,22 @@ pub fn compile_word_map() -> anyhow::Result<LanguageMap> {
         }
     }
 
-    let language_map = language_map.into_inner();
-    Ok(language_map)
+    Ok(language_map.into_inner())
 }
 
 fn gather_files() -> Vec<PathBuf> {
-    let mut file_list = Vec::new();
-    for entry in WalkDir::new("sources").into_iter().filter_map(|e| e.ok()) {
-        if let Some(str) = entry.path().extension().map(|s| s.to_string_lossy()) {
-            if str.as_ref() == "bz2" {
-                file_list.push(entry.into_path());
-            }
-        }
-    }
-    file_list
+    WalkDir::new("sources")
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .map(|s| s.to_string_lossy().as_ref() == "bz2")
+                .unwrap_or_default()
+        })
+        .map(|entry| entry.into_path())
+        .collect()
 }
 
 fn read_file(filename: impl AsRef<Path>) -> anyhow::Result<Vec<Tweet>> {
@@ -92,15 +102,12 @@ fn word_qualifies(&word: &&str) -> bool {
     }
 
     fn is_emoji(s: &str) -> bool {
-        const UNICODE_FITZ_BLOCK_START: usize = 0x1F3FB;
-        const UNICODE_FITZ_BLOCK_END: usize = 0x1F3FF;
-        const UNICODE_EMOJI_BLOCK_START: usize = 0x1F600;
-        const UNICODE_EMOJI_BLOCK_END: usize = 0x1F64F;
+        const UNICODE_FITZPATRICK_RANGE: RangeInclusive<usize> = 0x1F3FB..=0x1F3FF;
+        const UNICODE_EMOJI_BLOCK_RANGE: RangeInclusive<usize> = 0x1F600..=0x1F64F;
         s.chars().all(|c| {
             let c = c as usize;
-            let is_fitzpatrick_type_modifier =
-                c >= UNICODE_FITZ_BLOCK_START && c <= UNICODE_FITZ_BLOCK_END;
-            let is_emoji = c >= UNICODE_EMOJI_BLOCK_START && c <= UNICODE_EMOJI_BLOCK_END;
+            let is_fitzpatrick_type_modifier = UNICODE_FITZPATRICK_RANGE.contains(&c);
+            let is_emoji = UNICODE_EMOJI_BLOCK_RANGE.contains(&c);
             is_fitzpatrick_type_modifier || is_emoji
         })
     }
