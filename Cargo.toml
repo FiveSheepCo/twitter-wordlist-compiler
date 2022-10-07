@@ -1,0 +1,5 @@
+[workspace]
+members = ["twc", "libtwc"]
+
+[profile.release]
+lto = true
