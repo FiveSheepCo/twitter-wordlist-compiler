@@ -179,7 +179,7 @@ fn process_tweets(tweets: Vec<Tweet>, global_map: &RwLock<LanguageMap>) {
             .map(cleanup_word)
             .filter(word_qualifies);
         for word in words {
-            *language_entry.entry(word.into()).or_default() += 1;
+            *language_entry.entry(word).or_default() += 1;
         }
     }
 
