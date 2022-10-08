@@ -15,6 +15,7 @@ fn main() -> anyhow::Result<()> {
 
     std::fs::create_dir_all("output")?;
     for (language, word_list) in language_map {
+        if word_list.len() == 0 { continue }
         let filename = format!("output/twitter_corpus_{}.txt", language);
         let entries = {
             let mut kvps = Vec::from_iter(word_list);
