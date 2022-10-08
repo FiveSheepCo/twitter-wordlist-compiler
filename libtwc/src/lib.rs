@@ -122,6 +122,13 @@ fn word_qualifies(word: &String) -> bool {
         s.chars().all(|c| SYMBOLS.contains(c))
     }
 
+    fn is_url(s: &str) -> bool {
+        const URL_PREFIXES: [&str; 5] = ["http://", "https://", "ftp://", "sftp://", "data:"];
+        let is_proper_url = Url::parse(s).is_ok();
+        let is_improper_url = URL_PREFIXES.iter().any(|prefix| s.starts_with(prefix));
+        is_proper_url || is_improper_url
+    }
+
     match word.as_ref() {
         // Empty or short strings
         s if s.is_empty() || s.chars().count() == 1 => false,
@@ -130,7 +137,7 @@ fn word_qualifies(word: &String) -> bool {
         // Hashtags
         s if s.starts_with('#') => false,
         // URLs
-        s if Url::parse(s).is_ok() => false,
+        s if is_url(s) => false,
         // Numeric strings
         s if s.chars().all(|c| c.is_numeric()) => false,
         // Emoji strings
@@ -151,7 +158,7 @@ fn word_qualifies(word: &String) -> bool {
 }
 
 fn cleanup_word(word: impl AsRef<str>) -> String {
-    const SYMBOLS: &str = "!@#$%^&*()_-+=<,>.?/'\"{[}]\\|`~\t\r\n";
+    const SYMBOLS: &str = "!$%^&*()_-+=<,>.?/'\"{[}]\\|`~\t\r\n";
     word.as_ref()
         .trim_matches(char::is_whitespace)
         .trim_matches(&SYMBOLS.chars().collect::<Vec<_>>()[..])
