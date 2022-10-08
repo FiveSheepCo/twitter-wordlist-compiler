@@ -158,9 +158,11 @@ fn word_qualifies(word: &String) -> bool {
 }
 
 fn cleanup_word(word: impl AsRef<str>) -> String {
-    const SYMBOLS: &str = "!$%^&*()_-+=<,>.?/'\"{[}]\\|`~\t\r\n";
+    const QUOTATION_MARKS: &str = "„“‟”‟’’❝❞〝〞〟＂'‚‘❛❜`\"";
+    const SYMBOLS: &str = "!$%^&*()_-+=<,>.?/{}[]\\|~\t\r\n";
     word.as_ref()
         .trim_matches(char::is_whitespace)
+        .trim_matches(&QUOTATION_MARKS.chars().collect::<Vec<_>>()[..])
         .trim_matches(&SYMBOLS.chars().collect::<Vec<_>>()[..])
         .to_string()
 }
