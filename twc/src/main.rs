@@ -4,18 +4,20 @@ use std::{
 };
 
 use clap::Parser;
-use libtwc::compile_word_map;
+use libtwc::TweetCompiler;
 
 #[derive(Debug, clap::Parser)]
 struct Args {}
 
 fn main() -> anyhow::Result<()> {
     let _args = Args::parse();
-    let language_map = compile_word_map()?;
+    let language_map = TweetCompiler::from_directory("sources").compile();
 
     std::fs::create_dir_all("output")?;
     for (language, word_list) in language_map {
-        if word_list.len() == 0 { continue }
+        if word_list.is_empty() {
+            continue;
+        }
         let filename = format!("output/twitter_corpus_{}.txt", language);
         let entries = {
             let mut kvps = Vec::from_iter(word_list);
